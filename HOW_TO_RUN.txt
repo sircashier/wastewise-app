@@ -1,0 +1,100 @@
+==========================================================
+ HOW TO RUN — TaponMoBasuraMo (WasteWise)
+ Two-stage waste classifier: YOLO11 + ResNet50 + Streamlit
+==========================================================
+
+WHAT YOU NEED FIRST
+-------------------
+* Python 3.10, 3.11, or 3.12  (NOT 3.13 / 3.14 — TensorFlow won't install)
+  Check with:   python --version
+  Get 3.12:     https://www.python.org/downloads/release/python-31210/
+                (tick "Add Python to PATH" during install)
+
+* These files must all be in this folder:
+    app.py
+    capson_yolo11s_best.pt        (YOLO11 - finds & crops the object)
+    waste_classifier_crops.keras  (ResNet50 - classifies the crop)
+    labels.json
+    requirements.txt
+    .streamlit\config.toml        (forces the light theme - do not delete)
+    HOW_TO_RUN.txt                (this file)
+
+
+FIRST-TIME SETUP  (do this ONCE per machine)
+--------------------------------------------
+1. Open PowerShell INSIDE this folder.
+   (In File Explorer: click the address bar, type "powershell", press Enter)
+
+2. Create the virtual environment:
+
+      py -3.12 -m venv .venv
+
+3. Install the dependencies (downloads ~1 GB, takes several minutes):
+
+      .venv\Scripts\python -m pip install --upgrade pip
+      .venv\Scripts\python -m pip install -r requirements.txt
+
+   If this errors with "could not find tensorflow-cpu", your Python
+   version is wrong — go back to WHAT YOU NEED FIRST.
+
+
+RUNNING THE APP  (every time)
+-----------------------------
+1. Open PowerShell inside this folder.
+2. Run:
+
+      .venv\Scripts\streamlit run app.py
+
+3. Your browser opens at  http://localhost:8501
+   (First launch may ask for an email — just press Enter to skip.
+    First classification is slow (~20-30s) while models load; after
+    that it's fast.)
+
+4. To STOP the app: click the PowerShell window, press  Ctrl + C
+   (or just close the window).
+
+
+USING THE APP
+-------------
+* Home tab -> Browse files -> upload a photo of a waste item.
+* The app draws a box around each detected object (up to 3 per photo)
+  and shows: the object it saw, the RA 9003 category, a confidence %,
+  and where to throw it.
+* If no object is detected, it classifies the whole image and shows a
+  yellow warning note — for best results, photograph ONE item up close.
+* Other tabs: How It Works / History / About Us.
+
+
+IF SOMETHING BREAKS
+-------------------
+* "streamlit is not recognized"
+    -> You skipped the venv. Use the full command:
+       .venv\Scripts\streamlit run app.py
+
+* "No module named ultralytics" (or tensorflow, etc.)
+    -> Dependencies not installed in the venv. Re-run step 3 of
+       FIRST-TIME SETUP.
+
+* App opens but crashes on upload / "file not found" errors
+    -> One of the model files is missing or renamed. Check the
+       6-file list above — names must match EXACTLY.
+
+* Wrong Python version errors
+    -> Delete the .venv folder and redo FIRST-TIME SETUP with py -3.12
+
+* Port already in use
+    -> Another copy is running. Close the other PowerShell window, or:
+       .venv\Scripts\streamlit run app.py --server.port 8502
+
+
+Mac / Linux (if ever needed)
+----------------------------
+  python3.12 -m venv .venv
+  .venv/bin/pip install -r requirements.txt
+  .venv/bin/streamlit run app.py
+  (Apple-Silicon Macs: replace tensorflow-cpu with tensorflow
+   in requirements.txt first)
+
+==========================================================
+ Web Science Capstone Project 2026
+==========================================================
