@@ -1,3 +1,8 @@
+import os
+# TF and torch each bundle their own OpenMP runtime; running both in one process
+# (YOLO + ResNet) segfaults on Linux unless threading is capped BEFORE either imports.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import streamlit as st
 import streamlit.components.v1 as components
 import numpy as np

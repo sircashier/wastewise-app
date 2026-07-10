@@ -1,7 +1,10 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 streamlit==1.58.0
 tensorflow-cpu==2.21.0
 pillow==12.2.0
 pandas>=2.2,<3
 numpy==2.5.0
 opencv-python-headless
+torch
+torchvision
 ultralytics>=8.3,<9
