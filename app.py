@@ -9,9 +9,12 @@ import numpy as np
 from PIL import Image
 import pandas as pd
 import datetime
+# Import torch (via ultralytics) BEFORE tensorflow — loading TF first initializes
+# its bundled C++ runtimes (libgomp/absl/protobuf) in a way that segfaults torch
+# kernels on Linux the first time both engines run in one process.
+from ultralytics import YOLO
 import tensorflow as tf
 from tensorflow.keras.applications.resnet50 import preprocess_input
-from ultralytics import YOLO
 import json
 
 st.set_page_config(
