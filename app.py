@@ -239,6 +239,8 @@ DETECT_CONF = 0.25   # low threshold: better to find something and let ResNet de
 MAX_OBJECTS = 3      # classify at most this many detected objects per photo
 LOW_CONF = 0.60      # below this, tell the user the model is unsure
 UNRECOGNIZED_CONF = 0.60  # fallback below this = treat as "no supported item recognized"
+SMALL_CROP_FRAC = 0.10  # crops under this fraction of the photo lose detail at 224x224
+                        # (QA: distant clear plastic misclassified; close-up was fine)
 
 @st.cache_resource
 def load_models():
@@ -283,6 +285,7 @@ def analyze_image(img: Image.Image):
             "crop": crop, "category": category, "confidence": conf,
             "object_name": res.names[int(box.cls)].replace("_", " "),
             "fallback": False,
+            "area_frac": ((x2 - x1) * (y2 - y1)) / (img.width * img.height),
         })
     return annotated, results
 
@@ -497,6 +500,15 @@ if page == "Home":
                         <div class="fallback-note">
                           ⚠️ <strong>Low confidence</strong> — the model is unsure about this one.
                           Please verify manually before disposing.
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    if not r["fallback"] and r.get("area_frac", 1.0) < SMALL_CROP_FRAC:
+                        st.markdown("""
+                        <div class="fallback-note">
+                          📏 <strong>This item is small in the photo</strong> — the classifier sees
+                          less detail, so the answer above is less reliable. For a better result,
+                          retake the photo closer so the item fills more of the frame.
                         </div>
                         """, unsafe_allow_html=True)
 
