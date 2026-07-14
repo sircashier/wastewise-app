@@ -241,6 +241,10 @@ LOW_CONF = 0.60      # below this, tell the user the model is unsure
 UNRECOGNIZED_CONF = 0.60  # fallback below this = treat as "no supported item recognized"
 SMALL_CROP_FRAC = 0.10  # crops under this fraction of the photo lose detail at 224x224
                         # (QA: distant clear plastic misclassified; close-up was fine)
+CONFIDENT = 0.90     # ResNet is the classification authority: at/above this confidence the
+                     # result is presented clean. The advisory caveats below (small-crop,
+                     # stage-disagreement) only appear when the classifier is itself unsure
+                     # (< this), so the UI never contradicts its own confidence score.
 
 @st.cache_resource
 def load_models():
@@ -519,7 +523,10 @@ if page == "Home":
                         </div>
                         """, unsafe_allow_html=True)
 
-                    if not r["fallback"] and r.get("area_frac", 1.0) < SMALL_CROP_FRAC:
+                    # Only nudge on a small crop when the classifier is also unsure — a
+                    # confident result (>= CONFIDENT) is trusted and shown without caveats.
+                    if (not r["fallback"] and r["confidence"] < CONFIDENT
+                            and r.get("area_frac", 1.0) < SMALL_CROP_FRAC):
                         st.markdown("""
                         <div class="fallback-note">
                           📏 <strong>This item is small in the photo</strong> — the classifier sees
@@ -530,9 +537,13 @@ if page == "Home":
 
                     # Stage disagreement: the detector's object label implies a different
                     # category than the classifier chose — flag it for the user.
+                    # Same principle: only flag detector/classifier disagreement when ResNet
+                    # is unsure. At high confidence its verdict is authoritative and YOLO's
+                    # noisy label (e.g. "glass" on a phone) shouldn't cast doubt on it.
                     implied = OBJ_IMPLIES.get(r["object_name"] or "", None)
                     final_cat = "Residual" if r["category"].startswith("Residual") else r["category"]
-                    if implied is not None and implied != final_cat:
+                    if (implied is not None and implied != final_cat
+                            and r["confidence"] < CONFIDENT):
                         implied_disp = CATEGORY_INFO[implied][2]
                         st.markdown(f"""
                         <div class="fallback-note">
