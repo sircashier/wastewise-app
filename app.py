@@ -8,7 +8,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import streamlit as st
 import streamlit.components.v1 as components
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import pandas as pd
 import datetime
 # Import torch (via ultralytics) BEFORE tensorflow — loading TF first initializes
@@ -60,12 +60,12 @@ st.markdown("""
   /* Cap displayed photos so tall portrait shots don't stretch the page */
   [data-testid="stImage"] img { max-height: 52vh; object-fit: contain; border: 1px solid var(--line); border-radius: 2px; }
   /* The height cap breaks Streamlit's fullscreen overlay (image stays capped while the
-     frame expands, and the exit control is lost) — hide the maximize control on images
-     and uncap any image that does end up in a fullscreen frame. */
+     frame expands, and the exit control is lost) — hide the maximize control on images.
+     NOTE: do NOT add an uncap rule scoped to stFullScreenFrame — in Streamlit 1.58 every
+     image is wrapped in that frame even when not fullscreen, so it disables the cap. */
   [data-testid="stElementContainer"]:has([data-testid="stImage"]) [data-testid="stElementToolbar"],
   button[title="View fullscreen"],
   [data-testid="StyledFullScreenButton"] { display: none !important; }
-  [data-testid="stFullScreenFrame"] [data-testid="stImage"] img { max-height: none !important; }
   /* Keep toasts above the full-width navbar layer */
   [data-testid="stToast"] { z-index: 999999 !important; }
   /* Hide the zero-height autoscroll helper iframe's container */
@@ -273,8 +273,24 @@ def analyze_image(img: Image.Image):
         return None, [{"crop": img, "category": category, "confidence": conf,
                        "object_name": None, "fallback": True}]
 
-    annotated = Image.fromarray(res.plot()[..., ::-1])  # BGR -> RGB
+    # Draw our own numbered boxes instead of res.plot(): YOLO's class labels are
+    # noisy (a reflective phone can read "glass") and only the crop matters —
+    # ResNet makes the category call. Numbers match the result cards.
     order = res.boxes.conf.argsort(descending=True)[:MAX_OBJECTS]
+    annotated = img.copy()
+    draw = ImageDraw.Draw(annotated)
+    lw = max(3, min(annotated.size) // 200)
+    badge = max(30, min(annotated.size) // 18)
+    try:
+        font = ImageFont.load_default(size=int(badge * 0.62))
+    except TypeError:  # older Pillow without size arg
+        font = ImageFont.load_default()
+    for n, j in enumerate(order, start=1):
+        bx1, by1, bx2, by2 = map(int, res.boxes[int(j)].xyxy[0].tolist())
+        draw.rectangle([bx1, by1, bx2, by2], outline=(63, 125, 63), width=lw)
+        draw.rectangle([bx1, by1, bx1 + badge, by1 + badge], fill=(63, 125, 63))
+        draw.text((bx1 + badge / 2, by1 + badge / 2), str(n),
+                  fill=(255, 255, 255), anchor="mm", font=font)
     results = []
     for j in order:
         box = res.boxes[int(j)]
