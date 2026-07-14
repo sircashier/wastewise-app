@@ -1,4 +1,6 @@
 import os
+import io
+import base64
 # TF and torch each bundle their own OpenMP runtime; running both in one process
 # (YOLO + ResNet) segfaults on Linux unless threading is capped BEFORE either imports.
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -57,6 +59,15 @@ st.markdown("""
 
   /* Cap displayed photos so tall portrait shots don't stretch the page */
   [data-testid="stImage"] img { max-height: 52vh; object-fit: contain; border: 1px solid var(--line); border-radius: 2px; }
+  /* The height cap breaks Streamlit's fullscreen overlay (image stays capped while the
+     frame expands, and the exit control is lost) — hide the maximize control on images
+     and uncap any image that does end up in a fullscreen frame. */
+  [data-testid="stElementContainer"]:has([data-testid="stImage"]) [data-testid="stElementToolbar"],
+  button[title="View fullscreen"],
+  [data-testid="StyledFullScreenButton"] { display: none !important; }
+  [data-testid="stFullScreenFrame"] [data-testid="stImage"] img { max-height: none !important; }
+  /* Keep toasts above the full-width navbar layer */
+  [data-testid="stToast"] { z-index: 999999 !important; }
   /* Hide the zero-height autoscroll helper iframe's container */
   [data-testid="stElementContainer"]:has(iframe[height="0"]) { display: none !important; }
 
@@ -109,6 +120,10 @@ st.markdown("""
   .result-card .result-category { font-family: var(--serif); font-weight: 600; font-size: 1.55rem; color: var(--ink); margin-bottom: 0.4rem; line-height: 1.1; }
   .result-card .result-instruction { font-size: 0.86rem; color: var(--ink-soft); line-height: 1.6; }
   .obj-chip { display: inline-block; background: transparent; border: 1px solid var(--line); border-radius: 0; padding: 0.2rem 0.7rem; font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 0.7rem; }
+  /* The exact crop each card was classified from — lets users match card to object */
+  .result-card .crop-thumb { float: right; width: 74px; height: 74px; object-fit: cover; border: 1px solid var(--line); margin-left: 0.8rem; margin-bottom: 0.4rem; }
+  /* Persistent success line (the toast is transient and easy to miss) */
+  .upload-ok { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); border-left: 3px solid var(--accent); padding: 0.35rem 0.8rem; margin: 0.8rem 0 0.2rem; }
 
   .conf-wrap { max-width: 260px; margin: 0.3rem 0 0.9rem; }
   .conf-track { height: 5px; background: rgba(32,36,29,.12); overflow: hidden; }
@@ -414,6 +429,16 @@ if page == "Home":
         else:
             st.toast("No object localized — classified the whole photo", icon="⚠️")
 
+        # Persistent success line — the toast alone disappears after a few seconds
+        # and QA reported it as missing.
+        if n_found:
+            st.markdown(f'<div class="upload-ok">✓ Photo received — '
+                        f'{n_found} object{"s" if n_found > 1 else ""} found and classified below</div>',
+                        unsafe_allow_html=True)
+        elif not unrecognized:
+            st.markdown('<div class="upload-ok">✓ Photo received — no distinct object found, '
+                        'whole image classified below</div>', unsafe_allow_html=True)
+
         st.markdown('<div id="results-anchor"></div>', unsafe_allow_html=True)
         col1, col2 = st.columns([1, 1], gap="medium")
 
@@ -439,12 +464,23 @@ if page == "Home":
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                for r in results:
+                for i, r in enumerate(results):
                     icon, card_css, display_name, instruction = CATEGORY_INFO[r["category"]]
-                    obj_chip = (f'<div class="obj-chip">🔍 detected: {r["object_name"]}</div>'
+                    # Number the chips when there are several objects so each card can
+                    # be matched to its item (QA: "can't tell which item is which").
+                    chip_prefix = f"object {i + 1} of {len(results)} · " if len(results) > 1 else ""
+                    obj_chip = (f'<div class="obj-chip">🔍 {chip_prefix}detected: {r["object_name"]}</div>'
                                 if r["object_name"] else "")
+                    # Show the exact crop this card was classified from.
+                    _tb = io.BytesIO()
+                    _thumb = r["crop"].copy()
+                    _thumb.thumbnail((160, 160))
+                    _thumb.convert("RGB").save(_tb, format="JPEG", quality=80)
+                    crop_thumb = (f'<img class="crop-thumb" alt="classified crop" '
+                                  f'src="data:image/jpeg;base64,{base64.b64encode(_tb.getvalue()).decode()}">')
                     st.markdown(f"""
                     <div class="result-card {card_css}">
+                      {crop_thumb}
                       {obj_chip}
                       <div class="label-eyebrow">This waste belongs to</div>
                       <div class="result-category">{display_name}</div>
