@@ -241,10 +241,12 @@ LOW_CONF = 0.60      # below this, tell the user the model is unsure
 UNRECOGNIZED_CONF = 0.60  # fallback below this = treat as "no supported item recognized"
 SMALL_CROP_FRAC = 0.10  # crops under this fraction of the photo lose detail at 224x224
                         # (QA: distant clear plastic misclassified; close-up was fine)
-CONFIDENT = 0.90     # ResNet is the classification authority: at/above this confidence the
+CONFIDENT = 0.95     # ResNet is the classification authority: at/above this confidence the
                      # result is presented clean. The advisory caveats below (small-crop,
                      # stage-disagreement) only appear when the classifier is itself unsure
                      # (< this), so the UI never contradicts its own confidence score.
+                     # Set at 0.95, not 0.90: QA saw a wrong clear-plastic->Infectious call at
+                     # 92.3% that must still be flagged; correct results observed at >=97.7%.
 
 @st.cache_resource
 def load_models():
